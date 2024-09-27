@@ -1,12 +1,24 @@
 # youtube-extract-desc
 
-Copy secret-example.json, rename it to secret.json and fill it with your credentials.
+## Overview
+This script extracts the descriptions of videos from a specified YouTube playlist using the YouTube Data API.
 
-Sample API Requests (documentation) : https://developers.google.com/youtube/v3/sample_requests
-Your Google API dashboard (administration) : https://console.cloud.google.com/apis/dashboard
-Your Google API keys (administration) : https://console.cloud.google.com/apis/credentials
+## Setup
+1. Copy `secret-example.json` and rename it to `secret.json`.
+2. Fill `secret.json` with your API credentials.
 
+## API Documentation
+- Sample API Requests: [YouTube Data API v3](https://developers.google.com/youtube/v3/sample_requests)
+- Google API Dashboard: [API Dashboard](https://console.cloud.google.com/apis/dashboard)
+- Google API Keys: [API Credentials](https://console.cloud.google.com/apis/credentials)
 
-conf/endpoints.json is not used yet, but define some endpoints formally.
+## Configuration
+- `conf/endpoints.json`: Currently not utilized, but designed to formally define some API endpoints.
+
+## Usage
+Run the script in your terminal. Ensure that you have the required permissions for the YouTube API.
+`./youtube-extract-desc.sh PLAYLIST_ID`
 
 ## TODO
+- Implement the usage of `conf/endpoints.json`.
+- Add error handling for API requests.
