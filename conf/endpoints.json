@@ -1,6 +1,6 @@
 {
     "api_base_url": "https://www.googleapis.com/youtube/v3",
-    "extra_query_params": "part=snippet&type=video&maxResults=50",
+    "extra_query_params": "part=snippet&type=video",
     "endpoints": [
         {
             "endpoint": "search",
