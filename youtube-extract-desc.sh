@@ -13,7 +13,7 @@
 
 RESULT_FOLDER="./results"
 CACHE_FOLDER="./cache"
-CACHE_FILE=$CACHE_FOLDER/cached-result.json
+MAX_RESULTS=50
 
 # Help
 printHelp() {
@@ -93,55 +93,145 @@ fetch_playlist_descriptions() {
   HTML_RESULT_FILE=$RESULT_FOLDER"/liste-des-cours-fontanier.html"
   echo "<html>" > "$HTML_RESULT_FILE"
   echo "<head><meta charset=\"UTF-8\"><title>$DOCUMENT_TITLE</title></head>" >> "$HTML_RESULT_FILE"
+  echo "<link rel="stylesheet" href="../css/tuiles.css">" >> "$HTML_RESULT_FILE"
   echo "<body><h1>$DOCUMENT_TITLE</h1>" >> "$HTML_RESULT_FILE"
-
+  echo "<div class=\"course-tile-container\">" >> "$HTML_RESULT_FILE"
+  
   NEXT_PAGE_TOKEN=""
   VIDEO_NUM=0 # While counter. Easier to find in code than plain old "i". Yeah, bash is great, but not that great. Well, it's pretty old...
   while true; do
+    QUERY="${YOUTUBE_API_BASE_URL}/playlistItems?playlistId=${PLAYLIST_ID}&pageToken=${NEXT_PAGE_TOKEN}&key=${API_KEY}&maxResults=${MAX_RESULTS}&${EXTRA_QUERY_PARAMS}"
     echo -e "\nQuerying API on"
-    echo -e "${YOUTUBE_API_BASE_URL}/playlistItems?playlistId=${PLAYLIST_ID}&pageToken=${NEXT_PAGE_TOKEN}&key=${API_KEY}&${EXTRA_QUERY_PARAMS}"
-    RESPONSE=$(curl -s "${YOUTUBE_API_BASE_URL}/playlistItems?playlistId=${PLAYLIST_ID}&pageToken=${NEXT_PAGE_TOKEN}&key=${API_KEY}&${EXTRA_QUERY_PARAMS}")
+    echo -e "$QUERY"
+    RESPONSE=$(curl -s "$QUERY")
     
-    echo "$RESPONSE" | jq -c '.items[] | {title: .snippet.title, description: .snippet.description, videoId: .snippet.resourceId.videoId, thumbnail: .snippet.thumbnails.default}' | while read -r item; do
+    echo -e "CACHE_FOLDER : $CACHE_FOLDER"
+    if [ ! -z "$CACHE_FOLDER" ]; then
+      CACHE_FILE="$CACHE_FOLDER/cache-$(date +'%Y%m%d-%H%M%S').json"
+      echo -e "CACHE_FILE : $CACHE_FILE"
+      echo "$RESPONSE" | jq '.' > "$CACHE_FILE"
+    fi
+    
+    # Tentative de lecture de la réponse avec "while read -r item"
+    # echo "$RESPONSE" | jq -c '.items[] | {title: .snippet.title, description: .snippet.description, videoId: .snippet.resourceId.videoId, thumbnail: .snippet.thumbnails.default}' | while read -r item; do
+    #
+    # Explication du problème :
+    # VIDEO_NUM est défini à l'extérieur de la boucle interne while read -r item.
+    # En Bash, chaque while read ou for qui lit son entrée à partir d'une commande crée un sous-shell distinct.
+    # Les variables modifiées dans ce sous-shell (comme VIDEO_NUM) ne persistent pas dans le shell parent.
+    
+    # Tentative d'itération sur les items avec un "for" normal
+    # for item in $items; do
+    #
+    # Explication du problème :
+    # Le problème provient probablement de la manière dont jq formate la sortie des items
+    # et comment ils sont lus par for item in $items. jq génère les éléments sous forme de chaîne JSON, mais le for en Bash divise les entrées par défaut en utilisant l'espace comme séparateur, ce qui entraîne des erreurs de parsing
+
+    items=$(echo "$RESPONSE" | jq -c '.items[] | {title: .snippet.title, description: .snippet.description, videoId: .snippet.resourceId.videoId, thumbnail: .snippet.thumbnails.default}')
+
+    IFS=$'\n' read -rd '' -a item_array <<< "$items"
+    # IFS=$'\n' permet de définir le séparateur comme le caractère de nouvelle ligne.
+    # read -rd '' -a item_array permet de lire les éléments de manière sûre et correcte dans un tableau.
+
+    for item in "${item_array[@]}"; do
+      # Extract video infos
       VIDEO_TITLE=$(echo "$item" | jq -r '.title')
-      VIDEO_DESCRIPTION=$(echo "$item" | jq -r '.description')
       VIDEO_ID=$(echo "$item" | jq -r '.videoId')
       VIDEO_LINK="https://www.youtube.com/watch?v=${VIDEO_ID}"
       VIDEO_THUMBNAIL=$(echo "$item" | jq -r '.thumbnail.url')
-      PLAN_DES_COURS=$(echo "$VIDEO_DESCRIPTION" | grep "^Plan des cours" | sed -n 's/.*\(https.*\)/\1/p')
+      VIDEO_DESCRIPTION=$(echo "$item" | jq -r '.description')
+      
+      # Extract custom urls from description
+      PLAN_DES_COURS=$(echo "$VIDEO_DESCRIPTION" | grep "^Plan des cours" | sed -n 's/.*\(https.*\)/\1/p') # Not used
+      VOCABULAIRE=$(echo "$VIDEO_DESCRIPTION" | grep "^Fiche de vocabulaire" | sed -n 's/.*\(https.*\)/\1/p')
       EXERCICES=$(echo "$VIDEO_DESCRIPTION" | grep "^Exercices de japonais" | sed -n 's/.*\(https.*\)/\1/p')
       CORRECTION_EXERCICES=$(echo "$VIDEO_DESCRIPTION" | grep "^Correction des exercices" | sed -n 's/.*\(https.*\)/\1/p')
+      TABLEAU=$(echo "$VIDEO_DESCRIPTION" | grep "^Imprimer le tableau" | sed -n 's/.*\(https.*\)/\1/p')
+      SOLUTION_TABLEAU=$(echo "$VIDEO_DESCRIPTION" | grep "^Solution du tableau" | sed -n 's/.*\(https.*\)/\1/p')
+      TRACE_HIRAGANA=$(echo "$VIDEO_DESCRIPTION" | grep "^Tracé des hiragana" | sed -n 's/.*\(https.*\)/\1/p')
+      TRACE_KATAKANA=$(echo "$VIDEO_DESCRIPTION" | grep "^Tracé des katakana" | sed -n 's/.*\(https.*\)/\1/p')
+      TABLEAU_HIRAGANA=$(echo "$VIDEO_DESCRIPTION" | grep "^Tableau des hiragana" | sed -n 's/.*\(https.*\)/\1/p')
+      TABLEAU_KATAKANA=$(echo "$VIDEO_DESCRIPTION" | grep "^Tableau des katakana" | sed -n 's/.*\(https.*\)/\1/p')
       
+      # Print info to console and HTML file (video title, clickable thumbnail and exercises urls)
       echo -e "\n$VIDEO_TITLE"
-      echo "<h2>${VIDEO_NUM}. $VIDEO_TITLE</h2>" >> "$HTML_RESULT_FILE"
-      echo "<a href = \"$VIDEO_LINK\" title=\"$VIDEO_DESCRIPTION\">" >> "$HTML_RESULT_FILE"
-      echo "  <img src = \"$VIDEO_THUMBNAIL\" />" >> "$HTML_RESULT_FILE"
-      echo "</a>" >> "$HTML_RESULT_FILE"
+      # echo "<h2>${VIDEO_NUM}. $VIDEO_TITLE</h2>" >> "$HTML_RESULT_FILE"
+      # echo "<a href = \"$VIDEO_LINK\" title=\"$VIDEO_DESCRIPTION\">" >> "$HTML_RESULT_FILE"
+      # echo "  <img src = \"$VIDEO_THUMBNAIL\" />" >> "$HTML_RESULT_FILE"
+      # echo "</a>" >> "$HTML_RESULT_FILE"
       
-      # if [[ ! -z "$PLAN_DES_COURS" ]]; then
-      #   echo "[$VIDEO_NUM] $VIDEO_TITLE : $PLAN_DES_COURS"
-      
-      #   echo "<ul>" >> "$HTML_RESULT_FILE"
-      #   echo "<li><a href=\"$PLAN_DES_COURS\" title=\"$VIDEO_DESCRIPTION\">Plan des cours</a></li>" >> "$HTML_RESULT_FILE"
-      #   echo "</ul>" >> "$HTML_RESULT_FILE"
-      # fi
+      echo "    <div class=\"course-tile\">" >> "$HTML_RESULT_FILE"
+      echo "        <a href = \"$VIDEO_LINK\" title=\"$VIDEO_DESCRIPTION\">" >> "$HTML_RESULT_FILE"
+      echo "          <img src=\"$VIDEO_THUMBNAIL\" alt=\"$VIDEO_DESCRIPTION\" class=\"course-thumbnail\" />" >> "$HTML_RESULT_FILE"
+      echo "        </a>" >> "$HTML_RESULT_FILE"
+      echo "        <div class=\"course-details\">" >> "$HTML_RESULT_FILE"
+      echo "            <h2>${VIDEO_NUM}. $VIDEO_TITLE</h3>" >> "$HTML_RESULT_FILE"
+      echo "            <div class=\"course-links\">" >> "$HTML_RESULT_FILE"
+      # echo "" >> "$HTML_RESULT_FILE"
 
-      # Add exercice link, and correction if available
+      # Add vocabulaire link
+      if [[ ! -z "$VOCABULAIRE" ]]; then
+        echo -e "Vocabulaire : $VOCABULAIRE"      
+        echo "  <a href=\"$VOCABULAIRE\" title=\"Vocabulaire\">Vocabulaire</a>" >> "$HTML_RESULT_FILE"
+      fi
+      
+      # Add tableau link
+      if [[ ! -z "$TABLEAU" ]]; then
+        echo -e "Tableau : $TABLEAU"
+        echo "  <a href=\"$TABLEAU\" title=\"Tableau\">Tableau</a>" >> "$HTML_RESULT_FILE"
+      fi
+      
+      # Add tableau_solution link
+      if [[ ! -z "$SOLUTION_TABLEAU" ]]; then
+        echo -e "Solution du tableau : $SOLUTION_TABLEAU"
+        echo "  <a href=\"$SOLUTION_TABLEAU\" title=\"Solution du tableau\">Solution du tableau</a>" >> "$HTML_RESULT_FILE"
+      fi
+      
+      # Add trace_hiragana link
+      if [[ ! -z "$TRACE_HIRAGANA" ]]; then
+        echo -e "Tracé des Hiragana : $TRACE_HIRAGANA"
+        echo "  <a href=\"$TRACE_HIRAGANA\" title=\"Tracé des Hiragana\">Tracé des Hiragana</a>" >> "$HTML_RESULT_FILE"
+      fi
+
+      # Add trace_katakana link
+      if [[ ! -z "$TRACE_KATAKANA" ]]; then
+        echo -e "Tracé des Katakana : $TRACE_KATAKANA"
+        echo "  <a href=\"$TRACE_KATAKANA\" title=\"Tracé des Katakana\">Tracé des Katakana</a>" >> "$HTML_RESULT_FILE"
+      fi
+      
+      # Add tableau_hiragana link
+      if [[ ! -z "$TABLEAU_HIRAGANA" ]]; then
+        echo -e "Tableau des Hiragana : $TABLEAU_HIRAGANA"
+        echo "  <a href=\"$TABLEAU_HIRAGANA\" title=\"Tableau des Hiragana\">Tableau des Hiragana</a>" >> "$HTML_RESULT_FILE"
+      fi
+
+      # Add tableau_katakana link
+      if [[ ! -z "$TABLEAU_KATAKANA" ]]; then
+        echo -e "Tableau des Katakana : $TABLEAU_KATAKANA"
+        echo "  <a href=\"$TABLEAU_KATAKANA\" title=\"Tableau des Katakana\">Tableau des Katakana</a>" >> "$HTML_RESULT_FILE"
+      fi
+
+      
+      # Add exercises link, and correction if available
       if [[ ! -z "$EXERCICES" ]]; then
         echo -e "Exercices : $EXERCICES"      
-        echo "<h3>Exercices</h3>" >> "$HTML_RESULT_FILE"
-        echo "<ul>" >> "$HTML_RESULT_FILE"
-        echo "  <li><a href=\"$EXERCICES\" title=\"Exercices\">Exercices</a></li>" >> "$HTML_RESULT_FILE"
+        echo "  <a href=\"$EXERCICES\" title=\"Exercices\">Exercices</a>" >> "$HTML_RESULT_FILE"
 
         if [[ ! -z "$CORRECTION_EXERCICES" ]]; then
           echo -e "Correction exercices : $EXERCICES"
-          echo "  <li><a href=\"$CORRECTION_EXERCICES\" title=\"Correction des exercices\">Correction des exercices</a></li>" >> "$HTML_RESULT_FILE"
+          echo "  <a href=\"$CORRECTION_EXERCICES\" title=\"Correction des exercices\">Correction des exercices</a>" >> "$HTML_RESULT_FILE"
         fi
-
-        echo "</ul>" >> "$HTML_RESULT_FILE"
       fi
+      echo "            </div>" >> "$HTML_RESULT_FILE"
+      echo "        </div>" >> "$HTML_RESULT_FILE"
+      echo "    </div>" >> "$HTML_RESULT_FILE"
       
       VIDEO_NUM=$((VIDEO_NUM+1))
+      
+      # Garde-fou
+      # if [ "$VIDEO_NUM" -gt 3 ]; then
+      #   break
+      # fi
     done
     
     # Check if there is another page of results
@@ -158,6 +248,7 @@ fetch_playlist_descriptions() {
   
   # Generate HTML footers
   echo -e "HTML file generated: $HTML_RESULT_FILE"
+  echo "</div>" >> "$HTML_RESULT_FILE"
   echo "</body></html>" >> "$HTML_RESULT_FILE"
 }
 
@@ -165,16 +256,10 @@ fetch_playlist_descriptions() {
 
 # Create result folder where generated HTML files will be located
 mkdir -p "$RESULT_FOLDER"
-mkdir -p "$CACHE_FOLDER"
+if [ ! -z "$CACHE_FOLDER" ]; then
+  mkdir -p "$CACHE_FOLDER"
+fi
 
 fetch_playlist_descriptions
 
 echo "Completed fetching descriptions."
-
-# EXAMPLES de résultat
-# Title: Le négatif des verbes japonais
-# Description: Mon manuel de japonais (idéal pour accompagner les vidéos YouTube) ▶ https://www.fnac.com/a18086039/Julien-Fontanier-Cours-de-japonais-par-Julien-Fontanier
-# Mes cartes pour apprendre hiragana et katakana ▶ https://www.fnac.com/a18777020/Julien-Fontanier-Cours-de-japonais-par-Julien-Fontanier-BOITE-KANA
-# Plan des cours ▶ https://docs.google.com/document/d/1Cvcu0qEbA8Ae4i28gBdyf5Mx0M5xC9cc6ViRhqpZDxY/edit?pref=2&pli=1
-# Exercices de japonais ▶ https://docs.google.com/document/d/1__0TlszCRQyeW7VwUHGGl-I__U2cP0ixSmxIsVyhax8/edit?usp=share_link
-# Correction des exercices ▶ https://docs.google.com/document/d/1OC0Ywfst6ffD-zhptmUAJZwJ-G85RVeKnl3ZLLmanrI/edit?usp=share_link
