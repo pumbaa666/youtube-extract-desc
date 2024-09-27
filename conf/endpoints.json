@@ -1,0 +1,26 @@
+{
+    "api_base_url": "https://www.googleapis.com/youtube/v3",
+    "extra_query_params": "part=snippet&type=video&maxResults=50",
+    "endpoints": [
+        {
+            "endpoint": "search",
+            "param": "q"
+        },
+        {
+            "endpoint": "videos",
+            "param": "id"
+        },
+        {
+            "endpoint": "channels",
+            "param": "id"
+        },
+        {
+            "endpoint": "playlists",
+            "param": "id"
+        },
+        {
+            "endpoint": "playlistItems",
+            "param": "playlistId"
+        }
+    ]
+}
