@@ -93,9 +93,10 @@ fetch_playlist_descriptions() {
   HTML_RESULT_FILE=$RESULT_FOLDER"/liste-des-cours-fontanier.html"
   echo "<html>" > "$HTML_RESULT_FILE"
   echo "<head><meta charset=\"UTF-8\"><title>$DOCUMENT_TITLE</title></head>" >> "$HTML_RESULT_FILE"
-  echo "<link rel="stylesheet" href="../css/tuiles.css">" >> "$HTML_RESULT_FILE"
+  echo "<link rel="stylesheet" href="tuiles.css">" >> "$HTML_RESULT_FILE"
   echo "<body><h1>$DOCUMENT_TITLE</h1>" >> "$HTML_RESULT_FILE"
   echo "<div class=\"course-tile-container\">" >> "$HTML_RESULT_FILE"
+  cp ./css/tuiles.css $RESULT_FOLDER
   
   NEXT_PAGE_TOKEN=""
   VIDEO_NUM=0 # While counter. Easier to find in code than plain old "i". Yeah, bash is great, but not that great. Well, it's pretty old...
