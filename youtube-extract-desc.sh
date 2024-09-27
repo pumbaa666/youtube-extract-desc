@@ -63,6 +63,7 @@ if [[ -z "$YOUTUBE_API_BASE_URL" ]]; then
 fi
 
 # Helper function to get the access token
+# Unused for now
 get_access_token() {
   echo "Visit the following URL to authorize this application:"
   echo "https://accounts.google.com/o/oauth2/auth?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=https://www.googleapis.com/auth/youtube.readonly&response_type=code"
@@ -132,7 +133,7 @@ fetch_playlist_descriptions() {
 
     IFS=$'\n' read -rd '' -a item_array <<< "$items"
     # IFS=$'\n' permet de définir le séparateur comme le caractère de nouvelle ligne.
-    # read -rd '' -a item_array permet de lire les éléments de manière sûre et correcte dans un tableau.
+    # read -rd  permet de lire les éléments de manière sûre et correcte dans un tableau.
 
     for item in "${item_array[@]}"; do
       # Extract video infos
@@ -142,7 +143,7 @@ fetch_playlist_descriptions() {
       VIDEO_THUMBNAIL=$(echo "$item" | jq -r '.thumbnail.url')
       VIDEO_DESCRIPTION=$(echo "$item" | jq -r '.description')
       
-      # Extract custom urls from description
+      # Extract custom urls from description # TODO factoriser
       PLAN_DES_COURS=$(echo "$VIDEO_DESCRIPTION" | grep "^Plan des cours" | sed -n 's/.*\(https.*\)/\1/p') # Not used
       VOCABULAIRE=$(echo "$VIDEO_DESCRIPTION" | grep "^Fiche de vocabulaire" | sed -n 's/.*\(https.*\)/\1/p')
       EXERCICES=$(echo "$VIDEO_DESCRIPTION" | grep "^Exercices de japonais" | sed -n 's/.*\(https.*\)/\1/p')
@@ -156,11 +157,6 @@ fetch_playlist_descriptions() {
       
       # Print info to console and HTML file (video title, clickable thumbnail and exercises urls)
       echo -e "\n$VIDEO_TITLE"
-      # echo "<h2>${VIDEO_NUM}. $VIDEO_TITLE</h2>" >> "$HTML_RESULT_FILE"
-      # echo "<a href = \"$VIDEO_LINK\" title=\"$VIDEO_DESCRIPTION\">" >> "$HTML_RESULT_FILE"
-      # echo "  <img src = \"$VIDEO_THUMBNAIL\" />" >> "$HTML_RESULT_FILE"
-      # echo "</a>" >> "$HTML_RESULT_FILE"
-      
       echo "    <div class=\"course-tile\">" >> "$HTML_RESULT_FILE"
       echo "        <a href = \"$VIDEO_LINK\" title=\"$VIDEO_DESCRIPTION\">" >> "$HTML_RESULT_FILE"
       echo "          <img src=\"$VIDEO_THUMBNAIL\" alt=\"$VIDEO_DESCRIPTION\" class=\"course-thumbnail\" />" >> "$HTML_RESULT_FILE"
@@ -168,9 +164,8 @@ fetch_playlist_descriptions() {
       echo "        <div class=\"course-details\">" >> "$HTML_RESULT_FILE"
       echo "            <h2>${VIDEO_NUM}. $VIDEO_TITLE</h3>" >> "$HTML_RESULT_FILE"
       echo "            <div class=\"course-links\">" >> "$HTML_RESULT_FILE"
-      # echo "" >> "$HTML_RESULT_FILE"
 
-      # Add vocabulaire link
+      # Add vocabulaire link # TODO factoriser
       if [[ ! -z "$VOCABULAIRE" ]]; then
         echo -e "Vocabulaire : $VOCABULAIRE"      
         echo "  <a href=\"$VOCABULAIRE\" title=\"Vocabulaire\">Vocabulaire</a>" >> "$HTML_RESULT_FILE"
@@ -211,7 +206,6 @@ fetch_playlist_descriptions() {
         echo -e "Tableau des Katakana : $TABLEAU_KATAKANA"
         echo "  <a href=\"$TABLEAU_KATAKANA\" title=\"Tableau des Katakana\">Tableau des Katakana</a>" >> "$HTML_RESULT_FILE"
       fi
-
       
       # Add exercises link, and correction if available
       if [[ ! -z "$EXERCICES" ]]; then
